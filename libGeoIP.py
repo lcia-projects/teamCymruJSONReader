@@ -1,8 +1,9 @@
 import geoip2.database
+import time
 
 class getGeoIP:
     def __init__(self):
-        print ("creating geoIP Object")
+        test=1
 
     def getGeoIPCity(self,ip):
         reader = geoip2.database.Reader('./geoip/GeoLite2-City.mmdb')

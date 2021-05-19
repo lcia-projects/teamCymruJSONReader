@@ -1,15 +1,22 @@
+import time
+
 from elasticsearch import Elasticsearch
 from tqdm import tqdm
 from datetime import datetime
 from libGeoIP import getGeoIP
 from multiprocessing.dummy import Pool as ThreadPool
 import multiprocessing
+import dateutil.parser
+
 from pprint import pprint
 # todo: bytes sent
 # todo: duration
 # todo: connections
 
 class teamCymruJSON:
+    record_count=0
+    total_records=0
+
     def __init__(self, jsonData):
         print ("object created")
         # for multi-processing
@@ -17,8 +24,8 @@ class teamCymruJSON:
         print("Number of Cores:", self.threadCount)
 
         self.jsonData = jsonData.copy()
-        self.processFullJSONData()
-        #self.processFullJSONData_Multi()
+        #self.processFullJSONData()
+        self.processFullJSONData_Multi()
 
     def processFullJSONData(self):
 
@@ -51,8 +58,10 @@ class teamCymruJSON:
         #   pool.map(<method to run>, <array of data to run it on>)
         for data_type in self.jsonData.keys():
             print ( "Submitting Data Type:", data_type)
-            results = pool.map(self.multiDo, self.jsonData[data_type])
-            print(results)
+            self.total_records=len(self.jsonData[data_type])
+            # pool.map(self.multiDo, self.jsonData[data_type])
+            tqdm(pool.map(self.multiDo, self.jsonData[data_type]), self.total_records)
+            self.record_count=0
 
         # stop the clock
         appEndTime = datetime.now()
@@ -62,32 +71,37 @@ class teamCymruJSON:
         print("Total Time Taken:", (appEndTime - appStartTime))
 
     def multiDo(self, data):
-        # geoIP_Obj = getGeoIP()
-        # data['geo'] = {}
+        geoIP_Obj = getGeoIP()
+        data['geo'] = {}
+        data['timestamp']="time will go here"
         es_index_name="teamcymru_query_"+data['query_type']
-        for item in data:
-            for key in data.keys():
-                if "time" in key or "date" in key:
-                    try:
-                        data[key] = self.convertDataString(data[key])
-                    except:
-                        print ("Time Conversaion Error on:", data[key])
-            #     if "ip_addr" in key:
-            #         geoKeyName = "geo_" + key
-            #         # data['geo'][geoKeyName] = geoIP_Obj.getGeoIPCity(data[key])
-            # if "start_time" in data.keys():
-            #     data['timestamp'] = data['start_time']
-            # print ("   :>", data)
-            #self.submitToES(data, es_index_name)
-
-    # do your magic on your data here, then return it
-    # or add it to a class defined data stucture
+        for key in data.keys():
+            if "time" in key or "date" in key:
+                try:
+                    data[key] = self.convertDataStringParser(data[key])
+                except:
+                    print ("Time Conversaion Error on:", data[key])
+            if "ip_addr" in key:
+                geoKeyName = "geo_" + key
+                data['geo'][geoKeyName] = geoIP_Obj.getGeoIPCity(data[key])
+            if "start_time" in data.keys():
+                data['timestamp'] = data['start_time']
+        self.record_count+=1
+        print ("Record: [", self.record_count,"/",self.total_records,"]")
+        self.submitToES(data, es_index_name)
 
 
     def convertDataString(self, dateString):
         # format: 2021-03-10 21:56:44
         date_time_obj = datetime.strptime(dateString, '%Y-%m-%d %H:%M:%S')
         return date_time_obj.strftime('%Y-%m-%dT%H:%M:%S%z')
+
+    def convertDataStringParser(self, dateString):
+        # format: 2021-03-10 21:56:44
+        date_time_obj= dateutil.parser.parse(dateString)
+        #date_time_obj = datetime.strptime(dateString, '%Y-%m-%d %H:%M:%S')
+        return date_time_obj.strftime('%Y-%m-%dT%H:%M:%S%z')
+
 
     def submitToES(self, data, index_name):
         try:
