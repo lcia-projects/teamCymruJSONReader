@@ -16,12 +16,21 @@ from pprint import pprint
 class teamCymruJSON:
     record_count=0
     total_records=0
+    resting_cores=0
 
     def __init__(self, jsonData):
         print ("object created")
         # for multi-processing
-        self.threadCount = (multiprocessing.cpu_count() / 2)
+        self.threadCount = (multiprocessing.cpu_count())
         print("Number of Cores:", self.threadCount)
+
+        self.es = Elasticsearch(
+            ['192.168.1.95'],
+            port=9200,
+            http_auth=('mike', 'Monday@1'),
+            retry_on_timeout=True,
+            maxsize=(self.threadCount+10)
+        )
 
         self.jsonData = jsonData.copy()
         self.reader = geoip2.database.Reader('./geoip/GeoLite2-City.mmdb')
@@ -75,7 +84,7 @@ class teamCymruJSON:
         data['geo'] = {}
         data['timestamp']="time will go here"
         es_index_name="teamcymru_query_"+data['query_type']
-
+        self.record_count+=1
         for key in data.keys():
             if "time" in key or "date" in key:
                 try:
@@ -87,10 +96,14 @@ class teamCymruJSON:
                 data['geo'][geoKeyName] = self.getGeoIPCity(data[key])
             if "start_time" in data.keys():
                 data['timestamp'] = data['start_time']
-            #self.record_count+=1
-            #print ("Record: [", self.record_count,"/",self.total_records,"]")
+        # if (self.record_count%5000)==0:
+        #     self.resting_cores+=1
+        #     print (" Taking a breather for 45 seconds, please wait..", "Cores Resting:", self.resting_cores)
+        #     time.sleep(30)
+        #     self.resting_cores-=1
         self.pbar.update(1)
         self.submitToES(data, es_index_name)
+        # time.sleep(.01)
 
     def convertDataString(self, dateString):
         # format: 2021-03-10 21:56:44
@@ -106,12 +119,7 @@ class teamCymruJSON:
 
     def submitToES(self, data, index_name):
         try:
-            es = Elasticsearch(
-                ['192.168.1.95'],
-                port=9200,
-                http_auth=('mike', 'Monday@1')
-            )
-            es.index(index=index_name, body=data)
+            self.es.index(index=index_name, body=data)
         except Exception as ex:
             print("Error:", ex, ":", "\n\n\n\n")
 

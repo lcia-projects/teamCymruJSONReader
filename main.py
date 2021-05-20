@@ -18,7 +18,7 @@ if __name__ == '__main__':
    folder='/Users/darrellmiller/fusionData/CymruData/'
    file='Adam_LPSS.json'
    file2='Malwar3Ninja.json'
-   with open((folder + file)) as fp:
+   with open((folder + file2)) as fp:
       query_name=file
       Lines = fp.readlines()
       for line in Lines:
