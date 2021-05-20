@@ -4,6 +4,7 @@ from elasticsearch import Elasticsearch
 from tqdm import tqdm
 from datetime import datetime
 from libGeoIP import getGeoIP
+import geoip2.database
 from multiprocessing.dummy import Pool as ThreadPool
 import multiprocessing
 import dateutil.parser
@@ -24,6 +25,7 @@ class teamCymruJSON:
         print("Number of Cores:", self.threadCount)
 
         self.jsonData = jsonData.copy()
+        self.reader = geoip2.database.Reader('./geoip/GeoLite2-City.mmdb')
         #self.processFullJSONData()
         self.processFullJSONData_Multi()
 
@@ -56,12 +58,14 @@ class teamCymruJSON:
 
         # run the multi-processing pool on an array
         #   pool.map(<method to run>, <array of data to run it on>)
+
         for data_type in self.jsonData.keys():
-            print ( "Submitting Data Type:", data_type)
             self.total_records=len(self.jsonData[data_type])
-            # pool.map(self.multiDo, self.jsonData[data_type])
-            tqdm(pool.map(self.multiDo, self.jsonData[data_type]), self.total_records)
-            self.record_count=0
+            with tqdm( total=self.total_records) as self.pbar:
+                print("Submitting Data Type:", data_type, " Total Records to Process:", self.total_records)
+                # pool.map(self.multiDo, self.jsonData[data_type])
+                pool.map(self.multiDo, self.jsonData[data_type])
+                self.record_count=0
 
         # stop the clock
         appEndTime = datetime.now()
@@ -75,6 +79,7 @@ class teamCymruJSON:
         data['geo'] = {}
         data['timestamp']="time will go here"
         es_index_name="teamcymru_query_"+data['query_type']
+
         for key in data.keys():
             if "time" in key or "date" in key:
                 try:
@@ -83,13 +88,13 @@ class teamCymruJSON:
                     print ("Time Conversaion Error on:", data[key])
             if "ip_addr" in key:
                 geoKeyName = "geo_" + key
-                data['geo'][geoKeyName] = geoIP_Obj.getGeoIPCity(data[key])
+                data['geo'][geoKeyName] = self.getGeoIPCity(data[key])
             if "start_time" in data.keys():
                 data['timestamp'] = data['start_time']
-        self.record_count+=1
-        print ("Record: [", self.record_count,"/",self.total_records,"]")
+            #self.record_count+=1
+            #print ("Record: [", self.record_count,"/",self.total_records,"]")
+        self.pbar.update(1)
         self.submitToES(data, es_index_name)
-
 
     def convertDataString(self, dateString):
         # format: 2021-03-10 21:56:44
@@ -113,3 +118,22 @@ class teamCymruJSON:
             es.index(index=index_name, body=data)
         except Exception as ex:
             print("Error:", ex, ":", "\n\n\n\n")
+
+    def getGeoIPCity(self,ip):
+
+        responseData={}
+        try:
+            response = self.reader.city(ip)
+            responseData['country_code'] = response.country.iso_code
+            responseData['most_specific.name'] = response.subdivisions.most_specific.name
+            responseData['most_specific.iso_code'] = response.subdivisions.most_specific.iso_code
+            responseData['response.city.name'] = response.city.name
+            responseData['postal.code'] = response.postal.code
+            responseData['location']={}
+            responseData['location']['lat'] = response.location.latitude
+            responseData['location']['lon'] = response.location.longitude
+            responseData['country.name'] = response.country.name
+            return responseData.copy()
+        except:
+            responseData=None
+            return responseData

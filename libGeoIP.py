@@ -1,4 +1,6 @@
 import geoip2.database
+import pygeoip
+
 import time
 
 class getGeoIP:
@@ -23,3 +25,6 @@ class getGeoIP:
         except:
             responseData=None
             return responseData
+
+    def __del__(self):
+        self.reader.close()
