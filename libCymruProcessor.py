@@ -3,7 +3,6 @@ import time
 from elasticsearch import Elasticsearch
 from tqdm import tqdm
 from datetime import datetime
-from libGeoIP import getGeoIP
 import geoip2.database
 from multiprocessing.dummy import Pool as ThreadPool
 import multiprocessing
@@ -21,7 +20,7 @@ class teamCymruJSON:
     def __init__(self, jsonData):
         print ("object created")
         # for multi-processing
-        self.threadCount = (multiprocessing.cpu_count() - 2)
+        self.threadCount = (multiprocessing.cpu_count() / 2)
         print("Number of Cores:", self.threadCount)
 
         self.jsonData = jsonData.copy()
@@ -30,8 +29,6 @@ class teamCymruJSON:
         self.processFullJSONData_Multi()
 
     def processFullJSONData(self):
-
-        geoIP_Obj=getGeoIP()
 
         for data_type in self.jsonData.keys():
             print ( "Submitting Data Type:", data_type)
@@ -44,7 +41,7 @@ class teamCymruJSON:
                         item[key] = self.convertDataString(item[key])
                     if "ip_addr" in key:
                         geoKeyName="geo_"+key
-                        item['geo'][geoKeyName]=geoIP_Obj.getGeoIPCity(item[key])
+                        item['geo'][geoKeyName]=self.getGeoIPCity(item[key])
                 if "start_time" in item.keys():
                     item['timestamp'] = item['start_time']
                 self.submitToES(item, es_index_name)
@@ -75,7 +72,6 @@ class teamCymruJSON:
         print("Total Time Taken:", (appEndTime - appStartTime))
 
     def multiDo(self, data):
-        geoIP_Obj = getGeoIP()
         data['geo'] = {}
         data['timestamp']="time will go here"
         es_index_name="teamcymru_query_"+data['query_type']
@@ -120,7 +116,6 @@ class teamCymruJSON:
             print("Error:", ex, ":", "\n\n\n\n")
 
     def getGeoIPCity(self,ip):
-
         responseData={}
         try:
             response = self.reader.city(ip)

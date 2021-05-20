@@ -15,9 +15,10 @@ if __name__ == '__main__':
 
    # builds python dictionary from team cymru "Export as full query as JSON"
    jsonDataDict={}
+   folder='/Users/darrellmiller/fusionData/CymruData/'
    file='Adam_LPSS.json'
    file2='Malwar3Ninja.json'
-   with open(('/Users/darrellmiller/fusionData/CymruData/'+ file)) as fp:
+   with open((folder + file)) as fp:
       query_name=file
       Lines = fp.readlines()
       for line in Lines:
