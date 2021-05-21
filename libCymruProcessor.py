@@ -62,9 +62,6 @@ class teamCymruJSON:
         # creates multi-processingPool using number of cores calculated
         pool = ThreadPool(self.threadCount)
 
-        # run the multi-processing pool on an array
-        #   pool.map(<method to run>, <array of data to run it on>)
-
         for data_type in self.jsonData.keys():
             self.total_records=len(self.jsonData[data_type])
             with tqdm( total=self.total_records) as self.pbar:
@@ -82,7 +79,7 @@ class teamCymruJSON:
 
     def multiDo(self, data):
         data['geo'] = {}
-        data['timestamp']="time will go here"
+        data['timestamp']=None
         es_index_name="teamcymru_query_"+data['query_type']
         self.record_count+=1
         for key in data.keys():
@@ -96,14 +93,8 @@ class teamCymruJSON:
                 data['geo'][geoKeyName] = self.getGeoIPCity(data[key])
             if "start_time" in data.keys():
                 data['timestamp'] = data['start_time']
-        # if (self.record_count%5000)==0:
-        #     self.resting_cores+=1
-        #     print (" Taking a breather for 45 seconds, please wait..", "Cores Resting:", self.resting_cores)
-        #     time.sleep(30)
-        #     self.resting_cores-=1
         self.pbar.update(1)
         self.submitToES(data, es_index_name)
-        # time.sleep(.01)
 
     def convertDataString(self, dateString):
         # format: 2021-03-10 21:56:44
@@ -115,7 +106,6 @@ class teamCymruJSON:
         date_time_obj= dateutil.parser.parse(dateString)
         #date_time_obj = datetime.strptime(dateString, '%Y-%m-%d %H:%M:%S')
         return date_time_obj.strftime('%Y-%m-%dT%H:%M:%S%z')
-
 
     def submitToES(self, data, index_name):
         try:
